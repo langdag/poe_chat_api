@@ -11,4 +11,4 @@
    Clone the repository to your local machine using Git.
 
    ```bash
-   git clone https://github.com/yourusername/my-go-project.git
+   git clone https://github.com/langdag/poe_chat_api.git
