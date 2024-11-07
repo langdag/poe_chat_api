@@ -9,3 +9,4 @@ vendor/
 .vscode/
 .env
 go.sum
+poe_chat_api
