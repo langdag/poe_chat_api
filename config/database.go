@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func Connection() {
 	// Database connection string
-	dsn := "postgres://sashko:password@localhost:5432/poe_chat_api"
+	dsn := os.Getenv("DSN")
 
 	// Initialize a connection pool
 	config, err := pgxpool.ParseConfig(dsn)

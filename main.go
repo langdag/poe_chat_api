@@ -14,8 +14,8 @@ import (
 )
 
 func main() {
-	config.Connection()
 	godotenv.Load(".env")
+	config.Connection()
 
 	serverPort := os.Getenv("PORT")
 	dbUrl := os.Getenv("DB_URL")
