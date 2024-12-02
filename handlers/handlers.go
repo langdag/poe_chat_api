@@ -14,7 +14,7 @@ import (
 	"github.com/langdag/poe_chat_api/database"
 )
 
-var jwtKey = os.Getenv("jwt_key")
+var jwtKey = []byte(os.Getenv("JWT"))
 
 type User struct {
 	Username string `json:"username"`
@@ -30,7 +30,14 @@ func GenerateJWT(username string) (string, error) {
 		ExpiresAt: jwt.NewNumericDate(expirationTime),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtKey)
+
+	// Sign the token
+	signedToken, err := token.SignedString(jwtKey)
+	if err != nil {
+		log.Printf("Error signing token: %v", err) // Log the error for debugging
+		return "", err
+	}
+	return signedToken, nil
 }
 
 // LoginHandler handles user login and returns a JWT token
@@ -41,9 +48,15 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify user credentials (use a proper DB check in production)
-	if user.Username != "testuser" || user.Password != "password" {
-		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+	var existingUser User
+
+	db := database.GetDBPool()
+
+	query := `SELECT username, password FROM users WHERE username = $1 AND password = $2 LIMIT 1`
+	err := db.QueryRow(context.Background(), query, user.Username, user.Password).Scan(&existingUser.Username, &existingUser.Password)
+
+	if err != nil {
+		w.Write([]byte("User not found!"))
 		return
 	}
 
@@ -91,7 +104,7 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 	if checked_user != nil {
 
 		w.WriteHeader(http.StatusConflict) // HTTP 409 Conflict status code
-    w.Write([]byte(fmt.Sprintf("User with username %s already exists", user.Username)))
+		w.Write([]byte(fmt.Sprintf("User with username %s already exists", user.Username)))
 		return
 	}
 
