@@ -9,7 +9,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/langdag/poe_chat_api/database"
 )
@@ -150,27 +149,4 @@ func JWTAuthMiddleware(next http.Handler) http.Handler {
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Welcome to the Home Page!"))
-}
-
-func GetUsersHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("List of users"))
-}
-
-func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("User created"))
-}
-
-func GetUserByIDHandler(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	w.Write([]byte("User ID: " + id))
-}
-
-func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	w.Write([]byte("User ID updated: " + id))
-}
-
-func DeleteUserHandler(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	w.Write([]byte("User ID deleted: " + id))
 }

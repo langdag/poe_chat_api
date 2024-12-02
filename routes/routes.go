@@ -26,12 +26,7 @@ func SetupRoutes() http.Handler {
 	// Define routes
 	router.Post("/login", handlers.LoginHandler)
 	router.Post("/registration", handlers.RegistrationHandler)
-	router.Get("/", handlers.HomeHandler)                    // Example: GET /
-	router.Get("/users", handlers.GetUsersHandler)           // Example: GET /users
-	router.Post("/users", handlers.CreateUserHandler)        // Example: POST /users
-	router.Get("/users/{id}", handlers.GetUserByIDHandler)   // Example: GET /users/:id
-	router.Put("/users/{id}", handlers.UpdateUserHandler)    // Example: PUT /users/:id
-	router.Delete("/users/{id}", handlers.DeleteUserHandler) // Example: DELETE /users/:id
+	router.Get("/", handlers.HomeHandler)
 
 	return router
 }
