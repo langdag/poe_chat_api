@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -81,6 +82,18 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := database.GetDBPool()
+
+	// Check if user with the given username or email already exists
+	var existingUser User
+
+	checkQuery := `SELECT username FROM users WHERE username = $1 LIMIT 1`
+	checked_user := db.QueryRow(context.Background(), checkQuery, user.Username, user.Email).Scan(&existingUser.Username)
+	if checked_user != nil {
+
+		w.WriteHeader(http.StatusConflict) // HTTP 409 Conflict status code
+    w.Write([]byte(fmt.Sprintf("User with username %s already exists", user.Username)))
+		return
+	}
 
 	query := `INSERT INTO users (username, email, password) VALUES ($1, $2, $3)`
 
