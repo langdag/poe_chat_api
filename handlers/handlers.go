@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/langdag/poe_chat_api/database"
+	"github.com/langdag/poe_chat_api/requests"
 )
 
 var jwtKey = []byte(os.Getenv("JWT"))
@@ -19,6 +18,10 @@ type User struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+type TokenResponse struct {
+	Token string `json:"token"`
 }
 
 // GenerateJWT generates a JWT token for authenticated users
@@ -42,10 +45,7 @@ func GenerateJWT(username string) (string, error) {
 // LoginHandler handles user login and returns a JWT token
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
+	requests.ParseJSON(r, &user)
 
 	var existingUser User
 
@@ -55,41 +55,36 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	err := db.QueryRow(context.Background(), query, user.Username, user.Password).Scan(&existingUser.Username, &existingUser.Password)
 
 	if err != nil {
-		w.Write([]byte("User not found!"))
+		requests.HandlerError(w, http.StatusNotFound, "Invalid username or password")
 		return
 	}
 
 	token, err := GenerateJWT(user.Username)
 	if err != nil {
-		http.Error(w, "Error generating token", http.StatusInternalServerError)
+		requests.HandlerError(w, http.StatusInternalServerError, "Error generating token")
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"token": token})
+	requests.WriteJSON(w, TokenResponse{Token: token})
 }
 
 // RegistrationHandler handles user registration
 func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 
-	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
+	requests.ParseJSON(r, &user)
 
 	if user.Username == "" {
-		http.Error(w, "Username cannot be empty", http.StatusBadRequest)
+		requests.HandlerError(w, http.StatusBadRequest, "Username cannot be empty")
 		return
 	}
 
 	if user.Email == "" {
-		http.Error(w, "Email cannot be empty", http.StatusBadRequest)
+		requests.HandlerError(w, http.StatusBadRequest, "Email cannot be empty")
 		return
 	}
 
 	if user.Password == "" {
-		http.Error(w, "Password cannot be empty", http.StatusBadRequest)
+		requests.HandlerError(w, http.StatusBadRequest, "Password cannot be empty")
 		return
 	}
 
@@ -99,29 +94,31 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 	var existingUser User
 
 	checkQuery := `SELECT username FROM users WHERE username = $1 LIMIT 1`
-	checked_user := db.QueryRow(context.Background(), checkQuery, user.Username, user.Email).Scan(&existingUser.Username)
-	if checked_user != nil {
-
-		w.WriteHeader(http.StatusConflict) // HTTP 409 Conflict status code
-		w.Write([]byte(fmt.Sprintf("User with username %s already exists", user.Username)))
+	err := db.QueryRow(context.Background(), checkQuery, user.Username, user.Email).Scan(&existingUser.Username)
+	if err == nil {
+        requests.HandlerError(w, http.StatusConflict, "User with username or email already exists")
 		return
 	}
 
 	query := `INSERT INTO users (username, email, password) VALUES ($1, $2, $3)`
 
-	_, err := db.Exec(context.Background(), query, user.Username, user.Email, user.Password)
+	_, err = db.Exec(context.Background(), query, user.Username, user.Email, user.Password)
 
 	if err != nil {
 		log.Fatalf("Failed to insert user: %v", err)
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("User registered successfully"))
+	response := requests.SuccessResponse{
+		Message: "User registered successfully",
+		Data:     user,
+	}
+
+	requests.HandlerResponse(w, http.StatusOK, response)
 }
 
 // AuthenticatedRoute demonstrates how to protect routes with JWT
 func AuthenticatedRoute(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("This is a protected route"))
+	requests.HandlerError(w, http.StatusUnauthorized, "Unauthorized")
 }
 
 // Middleware to verify JWT tokens
@@ -148,5 +145,9 @@ func JWTAuthMiddleware(next http.Handler) http.Handler {
 }
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Welcome to the Home Page!"))
+	response := requests.SuccessResponse{
+		Message: "Welcome to the Home Page!",
+		Data:    nil,
+	}
+	requests.HandlerResponse(w, http.StatusOK, response)
 }

@@ -6,12 +6,12 @@ import (
 	"net/http"
 )
 
-type successResponse struct {
+type SuccessResponse struct {
 	Message string   `json:"message"`
 	Data interface{} `json:"data"`
 }
 
-type errResponse struct {
+type ErrResponse struct {
 	Error string `json:"error"`
 }
 
@@ -31,5 +31,5 @@ func HandlerError(w http.ResponseWriter, code int, message string) {
 	if code > 499 {
 		log.Printf("Error: %s", message)
 	}
-	HandlerResponse(w, code, errResponse{Error: message})
+	HandlerResponse(w, code, ErrResponse{Error: message})
 }

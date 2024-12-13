@@ -14,3 +14,11 @@ func ParseJSON(r *http.Request, payload interface{}) error {
 	}
 	return nil
 }
+
+func WriteJSON(w http.ResponseWriter, payload interface{}) error {
+	encoder := json.NewEncoder(w)
+	if err := encoder.Encode(payload); err != nil {
+		return fmt.Errorf("error writing JSON: %w", err)
+	}
+	return nil
+}

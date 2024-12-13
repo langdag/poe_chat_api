@@ -5,11 +5,11 @@ ENV=${1:-development}
 case $ENV in
   development)
     DRIVER="postgres"
-    DB_STRING="host=localhost port=5432 user=sashko password=password dbname=poe_chat_api sslmode=disable"
+    DB_STRING="host=localhost port=5432 user=vyacheslavchumakov password=1111 dbname=poe_chat_api sslmode=disable"
     ;;
   production)
     DRIVER="postgres"
-    DB_STRING="host=prod_host port=5432 user=sashko password=password dbname=poe_chat_api sslmode=require"
+    DB_STRING="host=prod_host port=5432 user=vyacheslavchumakov password=1111 dbname=poe_chat_api sslmode=require"
     ;;
   *)
     echo "Unknown environment: $ENV"
