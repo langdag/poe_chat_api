@@ -9,16 +9,12 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/langdag/poe_chat_api/database"
+	"github.com/langdag/poe_chat_api/models"
 	"github.com/langdag/poe_chat_api/requests"
+	"github.com/langdag/poe_chat_api/validations"
 )
 
 var jwtKey = []byte(os.Getenv("JWT"))
-
-type User struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
 
 type TokenResponse struct {
 	Token string `json:"token"`
@@ -44,22 +40,27 @@ func GenerateJWT(username string) (string, error) {
 
 // LoginHandler handles user login and returns a JWT token
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	var user User
-	requests.ParseJSON(r, &user)
+	var user models.LoginUser
+    requests.ParseJSON(r, &user)
 
-	var existingUser User
+    validationsError := validations.HandleValidations(w, user)
+    if validationsError != nil {
+	  return
+    }
+
+	var existingUser models.DefaultUser
 
 	db := database.GetDBPool()
 
-	query := `SELECT username, password FROM users WHERE username = $1 AND password = $2 LIMIT 1`
-	err := db.QueryRow(context.Background(), query, user.Username, user.Password).Scan(&existingUser.Username, &existingUser.Password)
+	query := `SELECT email, password FROM users WHERE email = $1 AND password = $2 LIMIT 1`
+	err := db.QueryRow(context.Background(), query, user.Email, user.Password).Scan(&existingUser.Email, &existingUser.Password)
 
 	if err != nil {
-		requests.HandlerError(w, http.StatusNotFound, "Invalid username or password")
+		requests.HandlerError(w, http.StatusNotFound, "Invalid email or password")
 		return
 	}
 
-	token, err := GenerateJWT(user.Username)
+	token, err := GenerateJWT(user.Email)
 	if err != nil {
 		requests.HandlerError(w, http.StatusInternalServerError, "Error generating token")
 		return
@@ -69,33 +70,22 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 // RegistrationHandler handles user registration
 func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
-	var user User
-
+	var user models.RegisterUser
 	requests.ParseJSON(r, &user)
 
-	if user.Username == "" {
-		requests.HandlerError(w, http.StatusBadRequest, "Username cannot be empty")
-		return
-	}
-
-	if user.Email == "" {
-		requests.HandlerError(w, http.StatusBadRequest, "Email cannot be empty")
-		return
-	}
-
-	if user.Password == "" {
-		requests.HandlerError(w, http.StatusBadRequest, "Password cannot be empty")
-		return
-	}
+	validationsError := validations.HandleValidations(w, user)
+    if validationsError != nil {
+	  return
+    }
 
 	db := database.GetDBPool()
 
 	// Check if user with the given username or email already exists
-	var existingUser User
+	var existingUser models.DefaultUser
 
 	checkQuery := `SELECT username FROM users WHERE username = $1 LIMIT 1`
 	err := db.QueryRow(context.Background(), checkQuery, user.Username, user.Email).Scan(&existingUser.Username)
-	if err == nil {
+	if err != nil {
         requests.HandlerError(w, http.StatusConflict, "User with username or email already exists")
 		return
 	}
