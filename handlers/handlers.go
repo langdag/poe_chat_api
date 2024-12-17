@@ -41,12 +41,12 @@ func GenerateJWT(username string) (string, error) {
 // LoginHandler handles user login and returns a JWT token
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var user models.LoginUser
-    requests.ParseJSON(r, &user)
+	requests.ParseJSON(r, &user)
 
-    validationsError := validations.HandleValidations(w, user)
-    if validationsError != nil {
-	  return
-    }
+	validationsError := validations.HandleValidations(w, user)
+	if validationsError != nil {
+		return
+	}
 
 	var existingUser models.DefaultUser
 
@@ -74,9 +74,9 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 	requests.ParseJSON(r, &user)
 
 	validationsError := validations.HandleValidations(w, user)
-    if validationsError != nil {
-	  return
-    }
+	if validationsError != nil {
+		return
+	}
 
 	db := database.GetDBPool()
 
