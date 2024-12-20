@@ -11,3 +11,4 @@ vendor/
 go.sum
 poe_chat_api
 settings/database.yml
+tmp/*
