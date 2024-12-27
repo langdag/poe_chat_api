@@ -3,7 +3,6 @@ package validations
 import (
     "github.com/go-playground/validator/v10"
     "net/http"
-    "encoding/json"
     "github.com/langdag/poe_chat_api/requests"
 )
 
@@ -41,22 +40,13 @@ func HandleValidations(w http.ResponseWriter, obj interface{}) error {
     if err != nil {
         if validationErrors, ok := err.(validator.ValidationErrors); ok {
             customErrors := parseValidationErrors(validationErrors)
-            sendErrorResponse(w, http.StatusBadRequest, customErrors)
+            requests.HandlerResponse(w, http.StatusBadRequest, customErrors)
             return err
         }
         requests.HandlerError(w, http.StatusBadRequest, err.Error()) // Assuming this function exists
         return err
     }
     return nil
-}
-
-// sendErrorResponse sends an error response with custom messages
-func sendErrorResponse(w http.ResponseWriter, status int, errors map[string]string) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(status)
-    json.NewEncoder(w).Encode(map[string]interface{}{
-        "errors": errors,
-    })
 }
 
 // parseValidationErrors parses the validation errors and retrieves custom messages

@@ -66,7 +66,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		requests.HandlerError(w, http.StatusInternalServerError, "Error generating token")
 		return
 	}
-	requests.WriteJSON(w, TokenResponse{Token: token})
+	requests.HandlerResponse(w, http.StatusOK, TokenResponse{Token: token})
 }
 
 // RegistrationHandler handles user registration
