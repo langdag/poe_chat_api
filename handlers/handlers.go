@@ -44,6 +44,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	requests.ParseJSON(r, &user)
 
 	validationsError := validations.HandleValidations(w, user)
+
 	if validationsError != nil {
 		return
 	}
@@ -65,7 +66,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		requests.HandlerError(w, http.StatusInternalServerError, "Error generating token")
 		return
 	}
-	requests.WriteJSON(w, TokenResponse{Token: token})
+	requests.HandlerResponse(w, http.StatusOK, TokenResponse{Token: token})
 }
 
 // RegistrationHandler handles user registration
@@ -86,7 +87,7 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 	checkQuery := `SELECT username FROM users WHERE username = $1 LIMIT 1`
 	err := db.QueryRow(context.Background(), checkQuery, user.Username, user.Email).Scan(&existingUser.Username)
 	if err != nil {
-        requests.HandlerError(w, http.StatusConflict, "User with username or email already exists")
+		requests.HandlerError(w, http.StatusConflict, "User with username or email already exists")
 		return
 	}
 
@@ -100,7 +101,7 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := requests.SuccessResponse{
 		Message: "User registered successfully",
-		Data:     user,
+		Data:    user,
 	}
 
 	requests.HandlerResponse(w, http.StatusOK, response)

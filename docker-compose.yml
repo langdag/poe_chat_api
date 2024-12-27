@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  go-app:
+    build: .                # Build from the Dockerfile in the current directory
+    ports:
+      - "8080:8080"         # Map port 8080 on the host to port 8080 in the container
+    environment:
+      - APP_ENV=development # Example environment variable for your Go app
+    volumes:
+      - .:/app              # Mount the current directory to /app in the container for live code updates
+    command: sh -c "go run main.go"  # Override CMD to run your Go app directly for development (remove for production)
