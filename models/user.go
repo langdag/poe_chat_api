@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 type RegisterUser struct {
 	Username string `json:"username" validate:"required"`
 	Email    string `json:"email" validate:"required,email"`
@@ -12,7 +14,9 @@ type LoginUser struct{
 }
 
 type DefaultUser struct{
+	ID       int    `json:"id"`
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	CreatedAt time.Time `json:"created_at"`
 }
