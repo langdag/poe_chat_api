@@ -17,6 +17,10 @@ import (
 	"github.com/langdag/poe_chat_api/validations"
 )
 
+type contextKey string
+
+const userID contextKey = "userID"
+
 var jwtKey = []byte(os.Getenv("JWT"))
 
 type TokenResponse struct {
@@ -56,8 +60,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	db := database.GetDBPool()
 
-	query := `SELECT email, password FROM users WHERE email = $1 AND password = $2 LIMIT 1`
-	err := db.QueryRow(context.Background(), query, user.Email, user.Password).Scan(&existingUser.Email, &existingUser.Password)
+	query := `SELECT id, email, password FROM users WHERE email = $1 AND password = $2 LIMIT 1`
+	err := db.QueryRow(context.Background(), query, user.Email, user.Password).Scan(&existingUser.ID, &existingUser.Email, &existingUser.Password)
 
 	if err != nil {
 		requests.HandlerError(w, http.StatusNotFound, "Invalid email or password")
@@ -111,6 +115,14 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UserHandler(w http.ResponseWriter, r *http.Request) {
+	ctxUserID := r.Context().Value(userID).(float64)
+	ctxIntID := int(ctxUserID)
+
+	if ctxUserID == 0 {
+		requests.HandlerError(w, http.StatusForbidden, "Access denied")
+		return
+	}
+
 	id := chi.URLParam(r, "id")
 
 	var user models.DefaultUser
@@ -132,6 +144,11 @@ func UserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if user.ID != ctxIntID {
+		requests.HandlerError(w, http.StatusForbidden, "Access denied")
+		return
+	}
+
 	response := requests.SuccessResponse{
 		Message: "User have being fetched successfully",
 		Data:    user,
@@ -144,21 +161,28 @@ func JWTAuthMiddleware(handlerFunc http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tokenStr := r.Header.Get("Authorization")
 		if tokenStr == "" {
-			requests.HandlerError(w, http.StatusUnauthorized, "Missing token")
+			requests.HandlerError(w, http.StatusForbidden, "Missing token")
 			return
 		}
 
-		claims := &jwt.MapClaims{}
+		claims := jwt.MapClaims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 			return jwtKey, nil
 		})
 		if err != nil || !token.Valid {
-			requests.HandlerError(w, http.StatusUnauthorized, "Access denied")
+			requests.HandlerError(w, http.StatusForbidden, "Access denied")
 			return
 		}
 
-		// Token is valid; proceed to the next handler
-		handlerFunc(w, r)
+		idStr, ok := claims["id"].(float64)
+		if !ok {
+			requests.HandlerError(w, http.StatusForbidden, "Access denied")
+			return
+		}
+
+		// Call the next handler with the user's ID as a context value
+		ctx := context.WithValue(r.Context(), userID, idStr)
+		handlerFunc(w, r.WithContext(ctx))
 	}
 }
 
@@ -170,5 +194,4 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	requests.HandlerResponse(w, http.StatusOK, response)
 }
 
-//Add comparing for token claims id with the user id from the database
 //Refactor to use refresh token with access tokens
