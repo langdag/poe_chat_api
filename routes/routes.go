@@ -24,6 +24,7 @@ func SetupRoutes() http.Handler {
 	router.Use(middleware.Logger)
 
 	// Define routes
+	router.Get("/users/{id}", handlers.JWTAuthMiddleware(handlers.UserHandler))
 	router.Post("/login", handlers.LoginHandler)
 	router.Post("/registration", handlers.RegistrationHandler)
 	router.Get("/", handlers.HomeHandler)
