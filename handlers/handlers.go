@@ -6,13 +6,20 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"database/sql"
+	"errors"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/langdag/poe_chat_api/database"
 	"github.com/langdag/poe_chat_api/models"
 	"github.com/langdag/poe_chat_api/requests"
 	"github.com/langdag/poe_chat_api/validations"
 )
+
+type contextKey string
+
+const userID contextKey = "userID"
 
 var jwtKey = []byte(os.Getenv("JWT"))
 
@@ -21,11 +28,11 @@ type TokenResponse struct {
 }
 
 // GenerateJWT generates a JWT token for authenticated users
-func GenerateJWT(username string) (string, error) {
+func GenerateJWT(user models.DefaultUser) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
-	claims := &jwt.RegisteredClaims{
-		Subject:   username,
-		ExpiresAt: jwt.NewNumericDate(expirationTime),
+	claims := &jwt.MapClaims{
+		"id":   user.ID,
+		"exp": jwt.NewNumericDate(expirationTime),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
@@ -53,15 +60,15 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	db := database.GetDBPool()
 
-	query := `SELECT email, password FROM users WHERE email = $1 AND password = $2 LIMIT 1`
-	err := db.QueryRow(context.Background(), query, user.Email, user.Password).Scan(&existingUser.Email, &existingUser.Password)
+	query := `SELECT id, email, password FROM users WHERE email = $1 AND password = $2 LIMIT 1`
+	err := db.QueryRow(context.Background(), query, user.Email, user.Password).Scan(&existingUser.ID, &existingUser.Email, &existingUser.Password)
 
 	if err != nil {
 		requests.HandlerError(w, http.StatusNotFound, "Invalid email or password")
 		return
 	}
 
-	token, err := GenerateJWT(user.Email)
+	token, err := GenerateJWT(existingUser)
 	if err != nil {
 		requests.HandlerError(w, http.StatusInternalServerError, "Error generating token")
 		return
@@ -107,32 +114,76 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 	requests.HandlerResponse(w, http.StatusOK, response)
 }
 
-// AuthenticatedRoute demonstrates how to protect routes with JWT
-func AuthenticatedRoute(w http.ResponseWriter, r *http.Request) {
-	requests.HandlerError(w, http.StatusUnauthorized, "Unauthorized")
+func UserHandler(w http.ResponseWriter, r *http.Request) {
+	ctxUserID := r.Context().Value(userID).(float64)
+	ctxIntID := int(ctxUserID)
+
+	if ctxUserID == 0 {
+		requests.HandlerError(w, http.StatusForbidden, "Access denied")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+
+	var user models.DefaultUser
+
+	db := database.GetDBPool()
+	query := `SELECT * FROM users WHERE id = $1`
+	err := db.QueryRow(context.Background(), query, id).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.Password,
+		&user.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		requests.HandlerError(w, http.StatusNotFound, "User not found")
+		return
+	}
+	if err != nil {
+		requests.HandlerError(w, http.StatusInternalServerError, "Error fetching user")
+		return
+	}
+
+	if user.ID != ctxIntID {
+		requests.HandlerError(w, http.StatusForbidden, "Access denied")
+		return
+	}
+
+	response := requests.SuccessResponse{
+		Message: "User have being fetched successfully",
+		Data:    user,
+	}
+	requests.HandlerResponse(w, http.StatusOK, response)
 }
 
 // Middleware to verify JWT tokens
-func JWTAuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func JWTAuthMiddleware(handlerFunc http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		tokenStr := r.Header.Get("Authorization")
 		if tokenStr == "" {
-			http.Error(w, "Missing token", http.StatusUnauthorized)
+			requests.HandlerError(w, http.StatusForbidden, "Missing token")
 			return
 		}
 
-		claims := &jwt.RegisteredClaims{}
+		claims := jwt.MapClaims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 			return jwtKey, nil
 		})
 		if err != nil || !token.Valid {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			requests.HandlerError(w, http.StatusForbidden, "Access denied")
 			return
 		}
 
-		// Token is valid; proceed to the next handler
-		next.ServeHTTP(w, r)
-	})
+		idStr, ok := claims["id"].(float64)
+		if !ok {
+			requests.HandlerError(w, http.StatusForbidden, "Access denied")
+			return
+		}
+
+		// Call the next handler with the user's ID as a context value
+		ctx := context.WithValue(r.Context(), userID, idStr)
+		handlerFunc(w, r.WithContext(ctx))
+	}
 }
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
@@ -142,3 +193,5 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	requests.HandlerResponse(w, http.StatusOK, response)
 }
+
+//Refactor to use refresh token with access tokens
