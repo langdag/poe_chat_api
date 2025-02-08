@@ -194,4 +194,38 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 	requests.HandlerResponse(w, http.StatusOK, response)
 }
 
+func MeHandler(w http.ResponseWriter, r *http.Request) {
+	ctxUserID := r.Context().Value(userID).(float64)
+
+	if ctxUserID == 0 {
+		requests.HandlerError(w, http.StatusForbidden, "Access denied")
+		return
+	}
+
+	var user models.Me
+
+	db := database.GetDBPool()
+	query := `SELECT id, username, email FROM users WHERE id = $1`
+
+	err := db.QueryRow(context.Background(), query, ctxUserID).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email)
+	if errors.Is(err, sql.ErrNoRows) {
+		requests.HandlerError(w, http.StatusNotFound, "User not found")
+		return
+	}
+	if err != nil {
+		requests.HandlerError(w, http.StatusInternalServerError, "Error fetching user")
+		return
+	}
+
+
+	response := requests.SuccessResponse{
+		Message: "User have being fetched successfully",
+		Data:    user,
+	}
+	requests.HandlerResponse(w, http.StatusOK, response)
+}
+
 //Refactor to use refresh token with access tokens
