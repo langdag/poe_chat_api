@@ -128,11 +128,12 @@ func UserHandler(w http.ResponseWriter, r *http.Request) {
 	var user models.DefaultUser
 
 	db := database.GetDBPool()
-	query := `SELECT * FROM users WHERE id = $1`
+	query :=`SELECT id, username, email, connection_type, password, created_at FROM users WHERE id = $1`
 	err := db.QueryRow(context.Background(), query, id).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
+		&user.ConnectionType,
 		&user.Password,
 		&user.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
