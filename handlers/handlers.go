@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"log"
 	"net/http"
 	"os"
 	"time"
-	"database/sql"
-	"errors"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
@@ -31,7 +31,7 @@ type TokenResponse struct {
 func GenerateJWT(user models.DefaultUser) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := &jwt.MapClaims{
-		"id":   user.ID,
+		"id":  user.ID,
 		"exp": jwt.NewNumericDate(expirationTime),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -128,12 +128,11 @@ func UserHandler(w http.ResponseWriter, r *http.Request) {
 	var user models.DefaultUser
 
 	db := database.GetDBPool()
-	query :=`SELECT id, username, email, connection_type, password, created_at FROM users WHERE id = $1`
+	query := `SELECT id, username, email, password, created_at FROM users WHERE id = $1`
 	err := db.QueryRow(context.Background(), query, id).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
-		&user.ConnectionType,
 		&user.Password,
 		&user.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -220,7 +219,6 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 		requests.HandlerError(w, http.StatusInternalServerError, "Error fetching user")
 		return
 	}
-
 
 	response := requests.SuccessResponse{
 		Message: "User have being fetched successfully",
