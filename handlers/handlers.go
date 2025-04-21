@@ -274,7 +274,7 @@ func ConnectionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := requests.SuccessResponse{
-		Message: "Connection have being fetched successfully",
+		Message: "Connection have being created successfully",
 		Data:    connection,
 	}
 	requests.HandlerResponse(w, http.StatusOK, response)
