@@ -91,9 +91,16 @@ func RegistrationHandler(w http.ResponseWriter, r *http.Request) {
 	// Check if user with the given username or email already exists
 	var existingUser models.DefaultUser
 
-	checkQuery := `SELECT username FROM users WHERE username = $1 LIMIT 1`
+	checkQuery := `SELECT username FROM users WHERE username = $1 OR email = $2 LIMIT 1`
 	err := db.QueryRow(context.Background(), checkQuery, user.Username, user.Email).Scan(&existingUser.Username)
-	if err != nil {
+
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		log.Printf("Database error: %v", err)
+		requests.HandlerError(w, http.StatusInternalServerError, "Database error")
+		return
+	}
+
+	if existingUser.Username != "" {
 		requests.HandlerError(w, http.StatusConflict, "User with username or email already exists")
 		return
 	}
