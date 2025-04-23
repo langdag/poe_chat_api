@@ -2,21 +2,15 @@ package models
 
 import "time"
 
-type ConnectionType struct {
-	TikTok    int
-	Instagram int
-}
-
 const (
 	ConnectionTypeTikTokInt    = 1
 	ConnectionTypeInstagramInt = 2
 )
 
-var connectionTypes = ConnectionType{
-	TikTok:    ConnectionTypeTikTokInt,
-	Instagram: ConnectionTypeInstagramInt,
+var ConnectionTypes = map[string]int{
+    "tiktok":    ConnectionTypeTikTokInt,
+    "instagram": ConnectionTypeInstagramInt,
 }
-
 
 type Connection struct {
 	ID             int       `json:"id"`

@@ -246,13 +246,8 @@ func ConnectionHandler(w http.ResponseWriter, r *http.Request) {
 	if validationError != nil {
 		return
 	}
-	var connectionTypeID int
 
-	if connection.ConnectionType == "tiktok" {
-		connectionTypeID = models.ConnectionTypeTikTokInt
-	} else if connection.ConnectionType == "instagram" {
-		connectionTypeID = models.ConnectionTypeInstagramInt
-	}
+	connectionTypeID := models.ConnectionTypes[connection.ConnectionType]
 
 	db := database.GetDBPool()
 
