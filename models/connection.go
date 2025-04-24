@@ -1,16 +1,15 @@
 package models
 
 import "time"
-import "encoding/json"
 
 const (
-	ConnectionTypeTikTokInt    int = 1
-	ConnectionTypeInstagramInt int = 2
+	ConnectionTypeTikTokInt    = 1
+	ConnectionTypeInstagramInt = 2
 )
 
-var ConnectionTypeStringMap = map[int]string{
-	ConnectionTypeTikTokInt:    "tiktok",
-	ConnectionTypeInstagramInt: "instagram",
+var ConnectionTypes = map[string]int{
+    "tiktok":    ConnectionTypeTikTokInt,
+    "instagram": ConnectionTypeInstagramInt,
 }
 
 type Connection struct {
@@ -20,13 +19,7 @@ type Connection struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
-func (c *Connection) MarshalJSON() ([]byte, error) {
-	type Alias Connection
-	return json.Marshal(&struct {
-		*Alias
-		ConnectionType string `json:"connection_type"`
-	}{
-		Alias:        (*Alias)(c),
-		ConnectionType: ConnectionTypeStringMap[c.ConnectionType],
-	})
+type CreateConnection struct {
+	UserID         int `json:"user_id" validate:"required"`
+	ConnectionType string `json:"connection_type" validate:"required,oneof=tiktok instagram"`
 }

@@ -235,3 +235,42 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //Refactor to use refresh token with access tokens
+
+
+func ConnectionHandler(w http.ResponseWriter, r *http.Request) {
+	var connection models.CreateConnection
+	requests.ParseJSON(r, &connection)
+
+	validationError := validations.HandleValidations(w, connection)
+
+	if validationError != nil {
+		return
+	}
+
+	connectionTypeID := models.ConnectionTypes[connection.ConnectionType]
+
+	db := database.GetDBPool()
+
+	check_connection := "SELECT connection_type FROM connections WHERE user_id = $1 AND connection_type = $2 LIMIT 1"
+	db_error := db.QueryRow(context.Background(), check_connection, connection.UserID, connectionTypeID).Scan(
+		&connectionTypeID,
+	)
+	if db_error == nil {
+		requests.HandlerError(w, http.StatusConflict, "Connection type already exists")
+		return
+	}
+
+	query := `INSERT INTO connections (user_id, connection_type) VALUES ($1, $2)`
+
+	_, err := db.Exec(context.Background(), query, connection.UserID, connectionTypeID)
+
+	if err != nil {
+		log.Fatalf("Failed to insert connection: %v", err)
+	}
+
+	response := requests.SuccessResponse{
+		Message: "Connection have being created successfully",
+		Data:    connection,
+	}
+	requests.HandlerResponse(w, http.StatusOK, response)
+}

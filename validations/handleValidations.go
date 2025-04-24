@@ -19,6 +19,10 @@ type UserValidationMessages struct {
     Password FieldValidationMessages `json:"Password"`
 }
 
+type ConnectionValidationMessages struct {
+    ConnectionType FieldValidationMessages `json:"ConnectionType"`
+}
+
 var CustomErrorMessages = UserValidationMessages{
     Username: FieldValidationMessages{
         Required: "Username cannot be empty.",
@@ -29,6 +33,13 @@ var CustomErrorMessages = UserValidationMessages{
     },
     Password: FieldValidationMessages{
         Required: "Password cannot be empty.",
+    },
+}
+
+var ConnectionCustomErrorMessages = ConnectionValidationMessages{
+    ConnectionType: FieldValidationMessages{
+        Required: "Connection type is required.",
+        Format:   "Invalid connection type.",
     },
 }
 
@@ -81,6 +92,12 @@ func getCustomMessage(fieldName, tag string) (string, bool) {
     case "Password":
         if tag == "required" {
             return CustomErrorMessages.Password.Required, true
+        }
+    case "ConnectionType":
+        if tag == "required" {
+            return ConnectionCustomErrorMessages.ConnectionType.Required, true
+        } else if tag == "oneof" {
+            return ConnectionCustomErrorMessages.ConnectionType.Format, true
         }
     }
     return "", false
