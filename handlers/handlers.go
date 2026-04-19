@@ -3,14 +3,17 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/gorilla/websocket"
 	"github.com/langdag/poe_chat_api/database"
 	"github.com/langdag/poe_chat_api/models"
 	"github.com/langdag/poe_chat_api/requests"
@@ -168,6 +171,9 @@ func JWTAuthMiddleware(handlerFunc http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tokenStr := r.Header.Get("Authorization")
 		if tokenStr == "" {
+			tokenStr = r.URL.Query().Get("token")
+		}
+		if tokenStr == "" {
 			requests.HandlerError(w, http.StatusForbidden, "Missing token")
 			return
 		}
@@ -271,6 +277,113 @@ func ConnectionHandler(w http.ResponseWriter, r *http.Request) {
 	response := requests.SuccessResponse{
 		Message: "Connection have being created successfully",
 		Data:    connection,
+	}
+	requests.HandlerResponse(w, http.StatusOK, response)
+}
+
+var clients = make(map[int]*websocket.Conn)
+var clientsMu sync.Mutex
+
+func chatConnectionHandler(w http.ResponseWriter, r *http.Request) {
+	ctxUserID, ok := r.Context().Value(userID).(float64)
+	if !ok {
+		log.Print("No user ID in context")
+		return
+	}
+	currentUserID := int(ctxUserID)
+
+	var upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true }, // Allow all origins for dev
+	}
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Print("Websocket connection error:", err)
+		return
+	}
+
+	clientsMu.Lock()
+	clients[currentUserID] = c
+	clientsMu.Unlock()
+
+	defer func() {
+		clientsMu.Lock()
+		delete(clients, currentUserID)
+		clientsMu.Unlock()
+		c.Close()
+	}()
+
+	for {
+		_, message, err := c.ReadMessage()
+		if err != nil {
+			log.Println("Error reading message:", err)
+			break
+		}
+		log.Printf("Received message from %d: %s", currentUserID, message)
+		
+		var chat models.CreateChat
+		if err := json.Unmarshal(message, &chat); err != nil {
+			log.Println("Error unmarshaling chat message:", err)
+			continue
+		}
+
+		clientsMu.Lock()
+		receiverConn, ok := clients[chat.ReceiverID]
+		clientsMu.Unlock()
+
+		if ok {
+			err = receiverConn.WriteMessage(websocket.TextMessage, message)
+			if err != nil {
+				log.Println("Error writing message to receiver:", err)
+			}
+		} else {
+			log.Printf("Receiver %d is not connected", chat.ReceiverID)
+			// optionally echo back an error or store it
+		}
+	}
+}
+
+func ChatHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" || r.Header.Get("Upgrade") == "websocket" {
+		chatConnectionHandler(w, r)
+	} else {
+		requests.HandlerError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+func ContactsHandler(w http.ResponseWriter, r *http.Request) {
+	ctxUserID, ok := r.Context().Value(userID).(float64)
+	if !ok || ctxUserID == 0 {
+		requests.HandlerError(w, http.StatusForbidden, "Access denied")
+		return
+	}
+	currentUserID := int(ctxUserID)
+
+	db := database.GetDBPool()
+	
+	// Query all registered users, excluding the current user.
+	query := `
+		SELECT id, username, email 
+		FROM users 
+		WHERE id != $1
+	`
+	rows, err := db.Query(context.Background(), query, currentUserID)
+	if err != nil {
+		requests.HandlerError(w, http.StatusInternalServerError, "Error fetching contacts")
+		return
+	}
+	defer rows.Close()
+
+	var contacts []models.DefaultUser
+	for rows.Next() {
+		var user models.DefaultUser
+		if err := rows.Scan(&user.ID, &user.Username, &user.Email); err == nil {
+			contacts = append(contacts, user)
+		}
+	}
+
+	response := requests.SuccessResponse{
+		Message: "Contacts fetched successfully",
+		Data:    contacts,
 	}
 	requests.HandlerResponse(w, http.StatusOK, response)
 }
